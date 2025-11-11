@@ -1,0 +1,261 @@
+First create three instances-> control-plane, node-1, node-2
+use c7i-flex.large, t3.small, t3.micro as instance type..
+ami- ubuntu 22.04
+key pair and sec group-> enable ports-> 6443 - Kubernetes API server
+                                     -> 2379-2380 - etcd server client API
+                                     -> 10250 - kubelet API
+                                     -> 10259 - kube-scheduler
+                                     -> 10257 - kube-controller-manager
+in control-plane instance
+->hostnamectl set-hostname controller.example.com
+->bash
+->apt update -y
+->apt install containerd -y
+->systemctl start containerd
+->systemctl enable containerd
+-> sudo modprobe overlay
+sudo modprobe br_netfilter
+cat > /etc/modules-load.d/kubernetes.conf << EOF
+br_netfilter
+ip_vs
+ip_vs_rr
+ip_vs_wrr
+ip_vs_sh
+overlay
+EOF
+
+-> cat > /etc/sysctl.d/kubernetes.conf << EOF
+net.ipv4.ip_forward = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+->sysctl --system
+->mkdir -p /etc/containerd
+->containerd config default | sudo tee /etc/containerd/config.toml
+->vim /etc/containerd/config.toml  ----{:se nu and change the line 139 to true}
+->systemctl restart containerd
+->systemctl enable containerd
+->sudo apt-get update
+->sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+->curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+->echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+->sudo apt-get update
+->sudo apt-get install -y kubelet kubeadm kubectl
+->sudo systemctl enable --now kubelet
+->kubeadm config images pull
+->kubeadm init  -->we will get the token, copy and paste
+           kubeadm join 172.31.88.187:6443 --token 1umduc.qzeih8jqzo506fu6 --discovery-token-ca-cert-hash sha256:ff1a3a1c95a79c46cda60b8fc414619299933fea9453461838dde3e5073cfd44
+
+->mkdir -p $HOME/.kube
+->sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+->sudo chown $(id -u):$(id -g) $HOME/.kube/config
+->kubectl get pod -A
+->kubectl get nodes
+->kubectl get nodes -o wide
+->curl https://raw.githubusercontent.com/projectcalico/calico/v3.29.2/manifests/calico.yaml -O
+->kubectl apply -f calico.yaml
+->kubectl get pod -A
+->kubectl get nodes
+->kubectl get nodes -o wide
+
+
+
+
+go to node-one instance and go to node-two instance
+do the same thing upto
+->sudo systemctl enable --now kubelet
+then now paste the token 
+then check the status in the controller server 
+   
+
+
+
+kubectl get pod
+kubectl get pod -n kube-system
+kubectl get ns
+mkdir /my-k8s-code
+cd /my-k8s-code
+vim firstpod.yaml   --->{code available in pods in Kubernetes documentation}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-app
+spec:
+  containers:
+  - name: apache
+    image: nginx:1.14
+    ports:
+    - containerPort: 80
+
+   
+kubectl apply -f firstpod.yaml
+kubectl get pod
+kubectl get pod -o wide
+kubectl describe pod web-app
+kubectl delete pod web-app
+kubectl get pod
+kubectl api-resources
+cat firstpod.yaml
+kubectl apply -f firstpod.yaml---> since it is deleted again we are giving this command
+kubectl get pod
+
+search replica set and open in the documentation
+
+vim second-app.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: frontend
+  labels:
+    app: guestbook
+    tier: frontend
+spec:
+  # modify replicas according to your case
+  replicas: 1
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        tier: frontend
+    spec:
+      containers:
+      - name: web-app
+        image: nginx:1.14
+
+{change name to web-app
+image : nginx:1.14
+replicas: 1}
+
+kubectl apply -f second-app.yaml
+kubectl get pod
+kubectl delete web-app
+kubectl delete *name of other pod*
+kubectl get pod
+
+kubectl describe pod *name of other pod*
+kubectl describe pod web-app
+kubectl describe pod web-app | grep -i Controlled
+kubectl describe pod *name of other pod* | grep -i Controlled
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------creating replica set
+
+->kubectl get pods -o wide
+->kubectl api-resources
+->cd /k8s-code/
+->vim devops-rs.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: devops-rs
+  labels:
+    app: devops-rs
+    tier: prod
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: prod
+  template:
+    metadata:
+      labels:
+        tier: prod
+    spec:
+      containers:
+      - name: web-apache
+        image: nginx
+
+->ll
+->kubectl apply -f devops-rs.yaml
+->kubectl get rs
+->kubectl describe rs devops-rs
+->kubectl describe pod devops-rs-dk5q5 (select any pod created by replica)
+->kubectl get pod
+->kubectl delete pod devops-rs-dk5q5 (select any pod and delete)
+->kubectl get pod
+->kubectl delete pod devops-rs-8c29r
+->kubectl delete pod devops-rs-bzqrn
+->kubectl delete pod devops-rs-k2gz9
+->kubectl get pod
+->kubectl get rs
+->kubectl describe rs devops-rs
+->kubectl describe pod devops-rs-npwdj | grep -i Controlled  (select any pod and describe it)
+
+
+#pod with env variable
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dbpod
+spec:
+  containers:
+  - name: mysql
+    image: mysql:latest
+    ports:
+    - containerPort: 3329
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: "redhat"
+
+#deployment autoscaling with hpa
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx-deployment
+  minReplicas: 4
+  maxReplicas: 10
+  metrics:
+   - type: Resource
+     resource:
+       name: cpu
+       target:
+         type: Utilization
+         averageUtilization: 50
+#kubectl get pod
+#kubectl describe pod (podname)
+
+update image version 
+#kubectl set image deployment.v1.apps/nginx-deployment nginx=nginx:1.16.1
+
+#kubectl get hpa 
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
