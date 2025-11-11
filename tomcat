@@ -1,0 +1,49 @@
+wget -O /etc/yum.repos.d/jenkins.repo/https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    3  wget -O /etc/yum.repos.d/jenkins.repo     https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    4  rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+    5  yum upgrade
+    6  yum install java-17-amazon-corretto -y
+    7  yum install jenkins -y
+    8  systemctl enable jenkins
+    9  systemctl start Jenkins
+open Jenkins page using the ip address and port number 
+   10  cat /var/lib/jenkins/secrets/initialAdminPassword
+   11  yum install maven -y
+   12  mvn -v
+   13  yum install git -y
+   14  yum install java* -y
+   15  yum install wget -y
+
+   16  wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.109/bin/apache-tomcat-9.0.109.tar.gz
+   17  unzip https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.109/bin/apache-tomcat-9.0.109.tar.gz
+   18  mv apache-tomcat-9.0.109.tar.gz
+   19  cd
+   20  cd apache-tomcat-9.0.109
+   21  wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.109/bin/apache-tomcat-9.0.109.tar.gz
+   22  unzip https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.109/bin/apache-tomcat-9.0.109.tar.gz
+   23  tar -zvxf apache-tomcat-9.0.55.tar.gz
+   24  tar -zvxf apache-tomcat-9.0.109.tar.gz
+   25  cd
+   26  ll
+   27  cd apache-tomcat-9.0.109
+   28  cd bin
+   29  ll
+   30  chmod +x startup.sh
+   31  chmod +x shutdown.sh
+   32  ln -s /opt/apache-tomcat-9.0.109/bin/startup.sh /usr/local/bin/tomcatup
+   33  ln -s /opt/apache-tomcat-9.0.109/bin/shutdown.sh /usr/local/bin/tomcatdown
+   34  cd apache-tomcat-9.0.55
+   35  cd apache-tomcat-9.0.109
+   36  cd
+   37  cd apache-tomcat-9.0.109
+   38  find -name context.xml
+   39  vim ./webapps/examples/META-INF/context.xml
+   40  vim ./webapps/host-manager/META-INF/context.xml
+   41  vim ./webapps/manager/META-INF/context.xml
+   42  cd conf/
+   43  vi tomcat-users.xml
+   44  cd
+   45  cd apache-tomcat-9.0.109
+   46  cd bin
+   47  ./shutdown.sh
+   48  ./startup.sh
