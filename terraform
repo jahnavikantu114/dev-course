@@ -1,0 +1,295 @@
+############################################################################################################################################################
+pipeline {
+    agent any
+ 
+    stages {
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/jahnavikantu114/devops-project.git', branch: 'main'
+            }
+        }
+ 
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+    }
+}
+
+############################################################################################################################################################
+
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven'
+    }
+
+    environment {
+        TOMCAT_USER = 'deployer'
+        TOMCAT_PASS = 'deployer'
+        TOMCAT_HOST = '52.91.205.225'
+        TOMCAT_PORT = '8080'
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/jahnavikantu114/devops-project.git'
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                sh 'mvn clean package -Dmaven.test.failure.ignore=true'
+            }
+        }
+
+        stage('Deploy to Tomcat') {
+            steps {
+                sh '''
+                    curl -u $TOMCAT_USER:$TOMCAT_PASS \
+                    --upload-file webapp/target/webapp.war \
+                    "http://$TOMCAT_HOST:$TOMCAT_PORT/manager/text/deploy?path=/webapp&update=true"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            junit '**/target/surefire-reports/TEST-*.xml'
+            archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
+        }
+    }
+}
+
+#######################################################
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven'
+    }
+
+    environment {
+        TOMCAT_USER = 'deployer'
+        TOMCAT_PASS = 'deployer'
+        TOMCAT_HOST = '52.91.205.225'
+        TOMCAT_PORT = '8080'
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/jahnavikantu114/devops-project.git'
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                sh 'mvn clean package -Dmaven.test.failure.ignore=true'
+            }
+        }
+
+        stage('Deploy to Tomcat') {
+            steps {
+                sh '''
+                    curl -u $TOMCAT_USER:$TOMCAT_PASS \
+                    --upload-file webapp/target/webapp.war \
+                    "http://$TOMCAT_HOST:$TOMCAT_PORT/manager/text/deploy?path=/webapp&update=true"
+                '''
+            }
+        }
+        stage('Deploy to Docker Host') {
+            steps {
+                sshPublisher(publishers: [
+                    sshPublisherDesc(
+                        configName: 'docker', 
+                        transfers: [
+                            sshTransfer(
+                                sourceFiles: '**/*',
+                                removePrefix: '',
+                                remoteDirectory: 'deploy',
+                                execCommand: '''
+                                    set -ex
+                                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 256927027886.dkr.ecr.us-east-1.amazonaws.com
+                                    cd deploy
+                                    docker build -t tomcat-webapp .
+                                    docker tag tomcat-webapp:latest 256927027886.dkr.ecr.us-east-1.amazonaws.com/tomcat-webapp:latest
+                                    docker push 256927027886.dkr.ecr.us-east-1.amazonaws.com/tomcat-webapp:latest
+                                '''
+                            )
+                        ]
+                    )
+                ])
+            }
+        }
+        stage('Deploy to EKS') {
+    steps {
+        sshPublisher(publishers: [
+            sshPublisherDesc(
+                configName: 'eks-node',
+                transfers: [
+                    sshTransfer(
+                        sourceFiles: 'deployment.yaml,service.yaml',
+                        remoteDirectory: '', // adjust as needed
+                        removePrefix: '',
+                        execCommand: '''
+                            set -ex
+                            aws eks update-kubeconfig --region us-east-1 --name my-cluster
+                            kubectl delete -f deployment.yaml
+                            kubectl apply -f deployment.yaml
+                            kubectl apply -f service.yaml
+                            kubectl rollout status deployment/regapp-deployment
+                        '''
+                    )
+                ],
+                usePromotionTimestamp: false,
+                verbose: true
+            )
+        ])
+    }
+}
+}
+
+    post {
+        success {
+            junit '**/target/surefire-reports/TEST-*.xml'
+            archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
+        }
+    }
+}
+
+
+
+
+
+
+
+
+##################################################################################################################
+resource "aws_vpc" "prod-vpc" {
+  cidr_block = "10.0.0.0/16"
+}
+## This is for IGW
+resource "aws_internet_gateway" "prod-igw" {
+  vpc_id = aws_vpc.prod-vpc.id
+  tags = {
+    Name = "prod-vpc"
+  }
+}
+## THis is for public subnet
+resource "aws_subnet" "public-subnet" {
+  vpc_id     = aws_vpc.prod-vpc.id
+  cidr_block = "10.0.0.0/24"
+  tags = {
+    Name = "public-subnet"
+  }
+}
+## THis is for private subnet
+resource "aws_subnet" "private-subnet" {
+  vpc_id     = aws_vpc.prod-vpc.id
+  cidr_block = "10.0.1.0/24"
+  tags = {
+    Name = "private-subnet"
+  }
+}
+## THis is for security group
+resource "aws_security_group" "test_access" {
+  name        = "test_access"
+  vpc_id      = aws_vpc.prod-vpc.id
+  description = "allow ssh and http"
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+# Security Group Ends Here
+# Creating Route table for public-subnet
+resource "aws_route_table" "public-rt" {
+  vpc_id = aws_vpc.prod-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.prod-igw.id
+  }
+}
+# Public route table associate
+resource "aws_route_table_association" "publiv-rt-asso" {
+  subnet_id      = aws_subnet.public-subnet.id
+  route_table_id = aws_route_table.public-rt.id
+}
+## ec2 in public subnet
+# Private server
+resource "aws_instance" "db-server" {
+  ami             = "ami-0341d95f75f311023"
+  subnet_id       = aws_subnet.public-subnet.id
+  instance_type   = "t3.micro"
+  security_groups = ["${aws_security_group.test_access.id}"]
+  key_name        = "amazon-key"
+  tags = {
+    Name     = "test-World"
+    Stage    = "testing"
+    Location = "chennai"
+  }
+}
+##create an EIP for EC2
+resource "aws_eip" "sanjay-ec2-eip" {
+  instance = aws_instance.db-server.id
+}
+# add ssh key
+resource "aws_key_pair" "amazon-key" {
+  key_name   = "terra"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC8UKmJt6KrOu5Mpt76ukh57VWDq/m1VP48idAcu+HBrPIUAKM3/8Asa+m+v3XFfwtkwHyNQYp/Jt4R+naoQ2EN7jPY/+LVR7A3H6L84/Anmx5TKDqnNE9zFskTLsWu/bIcaeXOP/Ira2nhG/0MZw+QVNY/CVI4SxPny2BsGS3VsIwl/0uL0rwNT35izGVmRCq//FmGifI0uNw2Jy5wI6cY9oii6JIShBw6yOZbaSiusPeL4Jo56dVhqV5iwU+rchFZCieZL62CM++jfIYnNkzRv2g2uWBQI/BiSgmG77c4cmXJKh8tgPQWwQJWZSwOLTLy4fO0E4ODz2zb91M/Te3od4K5YkSnM7cG9c/XWYzUTVi6v1ZzG1/oPeSZ7UixEDSDvNfhJ2ys16LUIWwYKH0Xn2yuNv1GAnftuhhrWyxDypABvVHT3zsDLHC113CanhUgPOLYzvNB+QfahwRy7ZToycj4rBMHJFdSYkxtgcDQR6c2dGnXqIufPK5DKlVWbrE= root@terraform.example.com"
+}
+##create a public ip for Nat gateway
+resource "aws_eip" "nat-eip" {
+}
+# Create NAT gateway
+resource "aws_nat_gateway" "my-ngw" {
+  allocation_id = aws_eip.nat-eip.id
+  subnet_id     = aws_subnet.public-subnet.id
+}
+resource "aws_route_table" "private-rt" {
+  vpc_id = aws_vpc.prod-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.my-ngw.id
+  }
+  tags = {
+    Name = "private-rt"
+  }
+}
+##route Tatable assosication code
+resource "aws_route_table_association" "private-asso" {
+  subnet_id      = aws_subnet.private-subnet.id
+  route_table_id = aws_route_table.private-rt.id
+}
+## Ec2 code
+resource "aws_instance" "deb-server" {
+  ami             = "ami-0341d95f75f311023"
+  subnet_id       = aws_subnet.public-subnet.id
+  instance_type   = "t3.micro"
+  security_groups = ["${aws_security_group.test_access.id}"]
+  key_name        = "amazon-key"
+  tags = {
+    Name     = "server1"
+    Stage    = "testing"
+    Location = "chennai"
+  }
+}
