@@ -1,0 +1,19 @@
+git install -y 
+git clone https://github.com/sanjayguruji/devops-mumbai.git
+cd devops-mumbai
+cd
+ssh-keygen
+cat /root/.ssh/id_rsa.pub
+copy the token and go to GitHub and then create ssh key
+cd devops-mumbai
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin git@github.com:jahnavikantu114/devops.git
+if it comes remote already existing then # git remote remove origin
+git remote add origin git@github.com:jahnavikantu114/devops.git
+git push -u main
+
+
+
