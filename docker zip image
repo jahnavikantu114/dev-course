@@ -1,0 +1,30 @@
+    1  yum install docker
+    2  systemctl start docker
+    3  systemctl enable docker
+    4  docker info
+    5  docker ps -a
+    6  docker images
+    7  docker pull nginx
+    8  docker image ls
+    9  docker run -it --name devops -p 8080:80 nginx:latest /bin/bash
+       apt update -y
+       apt install apache2 -y
+       cd /var/www/html/
+       echo "This is my Devops Server" > index.html
+       service apache2 start
+   10  docker inspect devops | less
+   11  curl http://172.17.0.2
+   12  docker ps -a
+   13  docker commit 167f0e15a6a4 devops-image
+   14  docker images
+//to save image into zip file
+   15  import image.tar.gz
+   16  docker import image.tar.gz
+   17  docker images
+   18  cd
+   19  docker commit 05f6b50eb836 new-zip-img
+   20  dokcer ps -a
+   21  docker ps -a
+   22  docker images
+   23  docker tag 05f6b50eb836 new-zip-img:img-new
+   24  docker images
