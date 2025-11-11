@@ -80,3 +80,25 @@ vim k8s-init.yaml
 hosts - all
 
 shell: link>>pod_network_setup.txt
+
+
+
+
+
+---
+- name: create multiple users
+  hosts: all
+  tasks:
+    - name: create multiple users
+      user:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - jahnavi
+        - dracula
+        - ironman
+        - devops
+
+ansible-playbook users.yaml --syntax-check
+ansible-playbook users.yaml -C
+ansible-playbook users.yaml 
