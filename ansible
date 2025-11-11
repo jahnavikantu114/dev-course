@@ -1,0 +1,82 @@
+---
+- name: doing some task
+  hosts: all
+  tasks:
+    - name: creating some users
+      user:
+        name: jahnavi
+        uid: 1101
+        home: /ltimindtree
+        shell: /bin/bash
+    - name: installed httpd
+      dnf:
+        name: httpd
+        state: latest
+    - name: httpd service started
+      systemd:
+         name: httpd
+         state: started
+         enabled: true
+    - name: installed cifs
+      dnf:
+        name: cifs-utils
+        state: present
+...
+
+
+apache-with-vars.yaml
+---
+- name: doing some task
+  hosts: all
+  vars:
+    
+     - web_server: httpd
+     - my_service: httpd
+     - my_destination: /var/www/html/index.html
+     - my_content: "my web server is running on my deployment server"
+     - my_rule: http
+     - my_firewalld: firewalld
+  tasks:
+     - name: installed apache
+       dnf:
+         name: "{{ web_server }}"
+         state: present
+     - name: started apache started
+       systemd:
+         name: "{{ my_service }}" 
+         state: started
+         enabled: true
+     - name: create an index.html in to /var/www/html/index.html
+       copy:
+         content: "{{ my_content }}"
+         dest: "{{ my_destination }}"
+     - name: install firewalld module
+       dnf:
+         name:"{{ my_firewalld }}"
+         state: present
+     - name: started firewalld
+       systemd:
+          name: firewalld
+          state: started
+          enabled: true
+     - name: add http rule in firewalld
+       firewalld:
+          service: "{{ my_rule }}"
+          immediate: true
+          permanent: true
+          state: enabled
+...      
+
+
+#ansible-galaxy install ansible-poisx
+
+Kubernetes installation:
+ansible-playbook k8s-master.yaml --syntax-check
+ansible-galaxy collection install community.general
+version - 32
+hosts-all
+
+vim k8s-init.yaml
+hosts - all
+
+shell: link>>pod_network_setup.txt
